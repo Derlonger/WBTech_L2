@@ -29,7 +29,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Текущее время:", time.Now().Format(time.RFC3339))
-
-	fmt.Println("Точное время:", ntpTime.Format(time.RFC3339))
+	fmt.Println("Текущее точное время:", ntpTime.Format(time.RFC3339))
 }
