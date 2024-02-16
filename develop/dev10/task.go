@@ -47,7 +47,7 @@ func main() {
 	// Устанавливаем соединение
 	conn, err := net.DialTimeout("tcp", address, *timeout)
 	if err != nil {
-		fmt.Println("Ошибка подключения: %v\n", err)
+		fmt.Printf("Ошибка подключения: %v\n", err)
 		return
 	}
 	defer conn.Close()

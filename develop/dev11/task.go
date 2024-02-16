@@ -1,5 +1,14 @@
 package main
 
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+	"time"
+)
+
 /*
 === HTTP server ===
 
@@ -22,6 +31,226 @@ package main
 	4. Код должен проходить проверки go vet и golint.
 */
 
-func main() {
+// Event представляет собой структуру для событий в календаре.
+type Event struct {
+	ID   int       `json:"id"`
+	Date time.Time `json:"date"`
+}
 
+// Сериализация объектов в Json
+func toJSON(v interface{}) ([]byte, error) {
+	return json.Marshal(v)
+}
+
+var events []Event
+
+func createEventHandler(writer http.ResponseWriter, request *http.Request) {
+	switch request.Method {
+	case "POST":
+		var event Event
+		if err := json.NewDecoder(request.Body).Decode(&event); err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		for i := range events {
+			if events[i].ID == event.ID {
+				writer.Write([]byte(fmt.Sprintf("ID %d alredy exists!", event.ID)))
+				return
+			}
+		}
+
+		events = append(events, event)
+		fmt.Println(events)
+		writer.Write([]byte("Row success created"))
+	default:
+		writer.Write([]byte("Only POST HTTP Method"))
+		return
+	}
+}
+
+func updateEventHandler(writer http.ResponseWriter, request *http.Request) {
+	switch request.Method {
+	case "PUT":
+		var event Event
+		if err := json.NewDecoder(request.Body).Decode(&event); err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		for i := range events {
+			if events[i].ID == event.ID {
+				events[i] = event
+				writer.Write([]byte("Row success update"))
+				return
+			}
+		}
+
+	default:
+		writer.Write([]byte("Only PUT HTTP Method"))
+		return
+
+	}
+}
+
+func deleteEventHandler(writer http.ResponseWriter, request *http.Request) {
+	switch request.Method {
+	case "DELETE":
+		id := request.URL.Query().Get("id")
+
+		for i := range events {
+			if strconv.Itoa(events[i].ID) == id {
+				events = append(events[:i], events[i+1:]...)
+				writer.Write([]byte("Row success delete"))
+				return
+			}
+
+		}
+	default:
+		writer.Write([]byte("Only DELETE HTTP Method"))
+		return
+	}
+}
+
+func eventsForDayHandler(writer http.ResponseWriter, request *http.Request) {
+	switch request.Method {
+	case "GET":
+		events := getEventsForLastDay()
+
+		// Сериализуем события в формат JSON
+		response, err := toJSON(events)
+		if err != nil {
+			writer.Write([]byte(fmt.Sprintf("Error: %v", err)))
+			return
+		}
+
+		writer.Header().Set("Content-Type", "application/json")
+
+		writer.Write(response)
+	default:
+		writer.Write([]byte("Only GET HTTP Method"))
+		return
+	}
+}
+
+func getEventsForLastDay() []Event {
+	var eventsForLastDay []Event
+
+	// Получение текущей даты и времени
+	now := time.Now()
+
+	// Определение временных границ для последнего дня
+	dayStart := now.AddDate(0, 0, -1).Truncate(24 * time.Hour)
+	dayEnd := now
+
+	// Перебор событий и выбор тех, которые в пределах последнего дня
+	for _, event := range events {
+		if event.Date.After(dayStart) && event.Date.Before(dayEnd) {
+			eventsForLastDay = append(eventsForLastDay, event)
+		}
+	}
+
+	return eventsForLastDay
+}
+
+func eventsForWeekHandler(writer http.ResponseWriter, request *http.Request) {
+	switch request.Method {
+	case "GET":
+		events := getEventsForLastWeek()
+
+		// Сериализуем события в формат JSON
+		response, err := toJSON(events)
+		if err != nil {
+			writer.Write([]byte(fmt.Sprintf("Error: %v", err)))
+			return
+		}
+
+		writer.Header().Set("Content-Type", "application/json")
+
+		writer.Write(response)
+	default:
+		writer.Write([]byte("Only GET HTTP Method"))
+		return
+	}
+}
+
+func getEventsForLastWeek() []Event {
+	var eventsForLastWeek []Event
+
+	// Получение текущей даты и времени
+	now := time.Now()
+
+	// Определение временных границ для последней недели
+	weekStart := now.AddDate(0, 0, -7).Truncate(24 * time.Hour)
+	weekEnd := now
+
+	// Перебор событий и выбор тех, которые в пределах последней недели
+	for _, event := range events {
+		if event.Date.After(weekStart) && event.Date.Before(weekEnd) {
+			eventsForLastWeek = append(eventsForLastWeek, event)
+		}
+	}
+
+	return eventsForLastWeek
+}
+
+func eventsForMonthHandler(writer http.ResponseWriter, request *http.Request) {
+	switch request.Method {
+	case "GET":
+		events := getEventsForLastMonth()
+
+		// Сериализуем события в формат JSON
+		response, err := toJSON(events)
+		if err != nil {
+			writer.Write([]byte(fmt.Sprintf("Error: %v", err)))
+			return
+		}
+
+		writer.Header().Set("Content-Type", "application/json")
+
+		writer.Write(response)
+	default:
+		writer.Write([]byte("Only GET HTTP Method"))
+		return
+	}
+}
+
+func getEventsForLastMonth() []Event {
+	var eventsForLastMonth []Event
+
+	// Получение текущей даты и времени
+	now := time.Now()
+
+	// Определение временных границ для последнего месяца
+	monthStart := now.AddDate(0, -1, 0).Truncate(24 * time.Hour)
+	monthEnd := now
+
+	// Перебор событий и выбор тех, которые в пределах последнего месяца
+	for _, event := range events {
+		if event.Date.After(monthStart) && event.Date.Before(monthEnd) {
+			eventsForLastMonth = append(eventsForLastMonth, event)
+		}
+	}
+
+	return eventsForLastMonth
+}
+
+func logging(f http.HandlerFunc) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		log.Println(request.URL.Path)
+		f(writer, request)
+	}
+}
+
+func main() {
+	// Регистрация обработчиков
+	http.HandleFunc("/create_event", logging(createEventHandler))
+	http.HandleFunc("/update_event", logging(updateEventHandler))
+	http.HandleFunc("/delete_event", logging(deleteEventHandler))
+	http.HandleFunc("/events_for_day", logging(eventsForDayHandler))
+	http.HandleFunc("/events_for_week", logging(eventsForWeekHandler))
+	http.HandleFunc("/events_for_month", logging(eventsForMonthHandler))
+
+	log.Printf("Server is running..")
+	log.Fatal(http.ListenAndServe(":8000", nil))
 }
